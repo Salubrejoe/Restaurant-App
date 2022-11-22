@@ -5,6 +5,9 @@ class CategoriesTableViewController: UITableViewController {
     
     var categories = [String]()
     
+    
+    // MARK: View Did Load
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         

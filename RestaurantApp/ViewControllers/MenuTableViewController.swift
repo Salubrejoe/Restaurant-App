@@ -5,6 +5,7 @@ class MenuTableViewController: UITableViewController  {
 
     var menuItems = [MenuItem] ()
     let category: String
+    var imageLoadTasks: [IndexPath: Task<Void, Never>] = [:]
     
     init?(coder: NSCoder, category: String) {
         self.category = category
@@ -14,6 +15,9 @@ class MenuTableViewController: UITableViewController  {
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
+    
+    
+    // MARK: View Did Load - Did Disappear
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -30,6 +34,15 @@ class MenuTableViewController: UITableViewController  {
         }
 
     }
+    
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        
+        imageLoadTasks.forEach { (key: IndexPath, value: Task<Void, Never>) in
+            value.cancel()
+        }
+    }
+    
     
     // MARK: Update UI & Display Error
     
@@ -69,19 +82,40 @@ class MenuTableViewController: UITableViewController  {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         let cell = tableView.dequeueReusableCell(withIdentifier: "MenuItem", for: indexPath)
+        
         configure(cell, indexPath: indexPath)
         
         return cell
     }
     
     func configure(_ cell: UITableViewCell, indexPath: IndexPath) {
-        let menuItem = menuItems[indexPath.row]
-        let formatter = NumberFormatter()
         
-        var content = cell.defaultContentConfiguration()
-        content.text = menuItem.name
-        content.secondaryText = menuItem.price.formatted(.currency(code: "bpd"))
-        cell.contentConfiguration = content
+        guard let cell = cell as? MenuItemCell else { return }
+        
+        let menuItem = menuItems[indexPath.row]
+        
+        cell.itemName = menuItem.name
+        cell.price = menuItem.price
+        cell.image = nil
+
+        
+        imageLoadTasks[indexPath] =  Task.init {
+            if let image = try? await MenuController.shared.fetchImage(from: menuItem.imageURL) {
+                if let currentIndexPath = self.tableView.indexPath(for: cell),
+                   currentIndexPath == indexPath {
+                    cell.image = image
+                }
+            }
+            imageLoadTasks[indexPath] = nil
+        }
+    }
+    
+    override func tableView(_ tableView: UITableView, didEndDisplaying cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        imageLoadTasks[indexPath]?.cancel()
+    }
+    
+    override func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        return 50
     }
 
 

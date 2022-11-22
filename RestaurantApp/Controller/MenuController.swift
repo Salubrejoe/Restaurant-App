@@ -1,10 +1,16 @@
 
-import Foundation
+import UIKit
 
 class MenuController {
-    // MARK: Shared singleton
+    // Shared singleton
     static let shared = MenuController()
+    static let orderUpdatedNotification = Notification.Name("MenuController.orderUpdated")
     
+    var order = Order() {
+        didSet {
+            NotificationCenter.default.post(name: MenuController.orderUpdatedNotification, object: nil)
+        }
+    }
     
     let baseURL = URL(string: "http://localhost:8080/")!
     
@@ -14,6 +20,7 @@ class MenuController {
         case categoriesNotFound
         case menuItemsNotFound
         case orderRequestFailed
+        case imageNotFound
     }
     
     // MARK: Fetch Categories
@@ -63,38 +70,55 @@ class MenuController {
     }
     
     
+    // MARK: Fetch Images
+    func fetchImage(from url: URL) async throws -> UIImage {
+        let (data, response) = try await URLSession.shared.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw MenuControllerError.imageNotFound
+        }
+        
+        guard let image = UIImage(data: data) else {
+            throw MenuControllerError.imageNotFound
+        }
+        
+        return image
+    }
+    
+    
     // MARK: Submit Order
+    
     typealias MinutesToPrepare = Int
     func submitOrder(forMenuIDs menuIDs: [Int]) async throws -> MinutesToPrepare {
-        let orderURL = baseURL.appendingPathExtension("order")
-        
+        let orderURL = baseURL.appendingPathComponent("order")
+
         // Create a URL request rather then submitting the request with a url
         var request = URLRequest(url: orderURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         // Store an array of menu IDs in JSON under menuIds with a dictionary
         let menuIdsDictionary = ["menuIds":menuIDs]
         let jsonEncoder = JSONEncoder()
         let jsonData = try? jsonEncoder.encode(menuIdsDictionary)
         // Store the data for a POST in the body of the request, then data(for:delegate:)
         request.httpBody = jsonData
-        
+
         // Make request
         let (data, response) = try await URLSession.shared.data(for: request)
-        
+
         //Catch errors
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
             throw MenuControllerError.orderRequestFailed
         }
-        
+
         // Decode
         let decoder = JSONDecoder()
         let orderResponse = try decoder.decode(OrderResponse.self, from: data)
-        
+
         return orderResponse.prepTime
     }
-    
     
 }
