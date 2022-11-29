@@ -2,6 +2,10 @@
 import UIKit
 
 class MenuController {
+    
+    var userActivity = NSUserActivity(activityType: "com.exercise.RestaurantApp.order"
+    )
+    
     // Shared singleton
     static let shared = MenuController()
     static let orderUpdatedNotification = Notification.Name("MenuController.orderUpdated")
@@ -9,6 +13,7 @@ class MenuController {
     var order = Order() {
         didSet {
             NotificationCenter.default.post(name: MenuController.orderUpdatedNotification, object: nil)
+            userActivity.order = order
         }
     }
     
